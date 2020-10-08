@@ -1,0 +1,25 @@
+Ce fichier sert à décrire les étapes à faire :
+
+	METTRE A JOUR LE README en fonction de l'avancement pour faire en sorte
+				qu'un utilisateur sache utiliser le projet
+	
+Trouver les syntaxes rust pour ces taches, elles nous permettront de signer : 
+	0-Importer Dalek
+
+	1-Commencer l'architecture du main
+
+	2-Définition d'un  payload
+
+	3-Fonction json.parse
+
+	4-Lire un fichier
+
+	5-Générer la keypair
+
+	6-Récupérer la clé privée
+
+	7-Signer
+
+	8-Afficher sur notre écran (console.log...)
+
+	9-Vérification = récupérer clé publique et vérif Dalek
