@@ -1,0 +1,2 @@
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/homes/e18charr/Documents/A3/Rust/Projet_IOT/nkeys/target/debug/build/typenum-ec0b4fc07b483526/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/homes/e18charr/Documents/A3/Rust/Projet_IOT/nkeys/target/debug/build/typenum-ec0b4fc07b483526/out/op.rs
