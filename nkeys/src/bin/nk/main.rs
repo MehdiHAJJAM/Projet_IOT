@@ -112,6 +112,19 @@ fn generate(kt: &KeyPairType, output_type: &Output) {
 
 
 fn didcomm() {
+
+    //Paths
+    let path = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\";
+    //let path = ""; 
+
+    //Names of the 2 files that will store the keys
+    let filename_seed = "alice_seed.txt";
+    let filename_pk = "alice_pk.txt";
+
+    let file_seed = format!("{}{}", path, filename_seed);
+    let file_pk = format!("{}{}", path, filename_pk);
+    
+
     let payload = json!({
     "id": "urn:uuid:ef5a7369-f0b9-4143-a49d-2b9c7ee51117",
     "type": "didcomm",
@@ -122,32 +135,49 @@ fn didcomm() {
     });
 
     let payload_string = serde_json::to_vec(&payload).unwrap();
-    //Check 
-    //Check if file exists
 
-    //Generate the sender key and write in the 2 files (priv et publ) if not :
-    //let kp = KeyPair::new(KeyPairType::User);
+    //Try to read the file to get the seed 
+    let mut sender_seed = fs::read_to_string(&file_seed);
+    if sender_seed.is_err() { 
+        //If it doesn't exist, we create it and update/create the public one
+        let kp = KeyPair::new(KeyPairType::User);
 
-    //Read the seed from the file : TODO: move the file in a folder far from here
-    /*let sender_seed = fs::read_to_string("alice.txt")
-        .expect("Something went wrong reading the file");
-    let sender_seed_str: &str = &sender_seed;
-    println!("{}", sender_seed);*/
-    let sender_seed_str = "SUAEQAVUZ7A7CBKQGTOCUGSB4T35Z6VTF3OXTPU2MUWUJZTMOLWVXHQXUY";
+        let f1 = fs::write(&file_seed, &kp.seed().unwrap());
+        if f1.is_err() {
+            panic!("Cannot write the seed file");
+        };
+
+        let f2 = fs::write(&file_pk, &kp.public_key());
+        if f2.is_err() {
+            panic!("Cannot write the public key file");
+        };
+
+        //Now that's it's written, we need to update sender_seed
+        sender_seed = fs::read_to_string(&file_seed);
+        if sender_seed.is_err(){
+            panic!("Cannot find the seed file");
+        }
+    }
+
+    let sender_seed_str: &str = &sender_seed.unwrap();
 
     //Sender signs using the keypair from seed
     let sender_kp = KeyPair::from_seed(&sender_seed_str).unwrap();        
     let sig = sender_kp.sign(&payload_string).unwrap();
 
     //Receiver have access only to the public file
-    let sender_pub_kp = KeyPair::from_public_key("UDTAPJ42PAKIVF2ZFSKRNT7WBQVFB62NHUY5CRYE6ZBR64KOXFXQHPBQ").unwrap();
-    //let sender_pub_kp = KeyPair::from_public_key("UCVLXNOAAD72JVJBZ67OETRJKTPJ6FVAZXXMTKDBGHFYFAD32LJQE246").unwrap();
+    let sender_pk = fs::read_to_string(&file_pk);
+    if sender_pk.is_err() {
+        panic!("Cannot find the public key file");
+    }
+    let sender_pub_kp = KeyPair::from_public_key(&sender_pk.unwrap()).unwrap();
+    //wrong public key if needed : UCVLXNOAAD72JVJBZ67OETRJKTPJ6FVAZXXMTKDBGHFYFAD32LJQE246
 
     //Check the signature
     let res = sender_pub_kp.verify(&payload_string,&sig.as_slice());
     match res {
-        Ok(()) => println!("Le message est bien de la part d'Alice"),
-        Err(_e) => println!("Le message ne vient pas d'Alice ou l'annuaire n'est pas à jour"), 
+        Ok(()) => println!("The message is from Alice"),
+        Err(_e) => println!("The message is not from Alice or the public key isn't updated"), 
     }
     
 }

@@ -5,17 +5,18 @@ nk didcomm
 
 ======================================================================================
 fn didcomm() {
-    
-    //Paths - Comment the ones you don't use 
-    let path_seed = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\alice_seed.txt";
-    let path_pk = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\alice_pk.txt";
+
+    //Paths
+    let path = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\";
     //let path = ""; 
 
-    /* TODO find a way to concat path + filenames to clean it up
     //Names of the 2 files that will store the keys
     let filename_seed = "alice_seed.txt";
     let filename_pk = "alice_pk.txt";
-    */
+
+    let file_seed = format!("{}{}", path, filename_seed);
+    let file_pk = format!("{}{}", path, filename_pk);
+    
 
     let payload = json!({
     "id": "urn:uuid:ef5a7369-f0b9-4143-a49d-2b9c7ee51117",
@@ -29,17 +30,25 @@ fn didcomm() {
     let payload_string = serde_json::to_vec(&payload).unwrap();
 
     //Try to read the file to get the seed 
-    let mut sender_seed = fs::read_to_string(path_seed);
+    let mut sender_seed = fs::read_to_string(&file_seed);
     if sender_seed.is_err() { 
         //If it doesn't exist, we create it and update/create the public one
         let kp = KeyPair::new(KeyPairType::User);
-        fs::write(path_seed, &kp.seed().unwrap());
-        fs::write(path_pk, &kp.public_key());
-        sender_seed = fs::read_to_string(path_seed);
+
+        let f1 = fs::write(&file_seed, &kp.seed().unwrap());
+        if f1.is_err() {
+            panic!("Cannot write the seed file");
+        };
+
+        let f2 = fs::write(&file_pk, &kp.public_key());
+        if f2.is_err() {
+            panic!("Cannot write the public key file");
+        };
+
+        //Now that's it's written, we need to update sender_seed
+        sender_seed = fs::read_to_string(&file_seed);
         if sender_seed.is_err(){
-            //TODO deal with the argument to raise an Error
-            println!("Cannot find the seed file. Exiting...");
-            return ();
+            panic!("Cannot find the seed file");
         }
     }
 
@@ -50,9 +59,9 @@ fn didcomm() {
     let sig = sender_kp.sign(&payload_string).unwrap();
 
     //Receiver have access only to the public file
-    let sender_pk = fs::read_to_string(path_pk);
+    let sender_pk = fs::read_to_string(&file_pk);
     if sender_pk.is_err() {
-        //Err(err!(FileNotFound,"The public key cannot be found"));
+        panic!("Cannot find the public key file");
     }
     let sender_pub_kp = KeyPair::from_public_key(&sender_pk.unwrap()).unwrap();
     //wrong public key if needed : UCVLXNOAAD72JVJBZ67OETRJKTPJ6FVAZXXMTKDBGHFYFAD32LJQE246
