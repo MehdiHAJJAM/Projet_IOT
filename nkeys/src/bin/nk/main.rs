@@ -2,6 +2,7 @@ extern crate serde_json;
 
 use nkeys::{self, KeyPair, KeyPairType};
 use serde_json::json;
+use serde_json::{Value};
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -9,9 +10,9 @@ use std::fs::File;
 use std::str::FromStr;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
-use std::net::{TcpListener,TcpStream, Shutdown};
+use std::net::{TcpListener,TcpStream};
 use std::io::{Read,Write};
-use std::str::from_utf8;
+//use std::str::from_utf8; // why isn't it necessary ?! oO
 
 #[derive(Debug, StructOpt, Clone)]
 #[structopt(
@@ -190,7 +191,7 @@ fn generate(kt: &KeyPairType, output_type: &Output) {
 fn didcomm() {
 
     //Paths
-    let path = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\";
+    let path = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\keys\\Alice\\";
     //let path = ""; 
 
     //Names of the 2 files that will store the keys
@@ -247,7 +248,7 @@ fn didcomm() {
         panic!("Cannot find the public key file");
     }
     let sender_pub_kp = KeyPair::from_public_key(&sender_pk.unwrap()).unwrap();
-    //wrong public key if needed : UCVLXNOAAD72JVJBZ67OETRJKTPJ6FVAZXXMTKDBGHFYFAD32LJQE246
+    //let sender_pub_kp = KeyPair::from_public_key("UCVLXNOAAD72JVJBZ67OETRJKTPJ6FVAZXXMTKDBGHFYFAD32LJQE246").unwrap();
 
     //Check the signature
     let res = sender_pub_kp.verify(&payload_string,&sig.as_slice());
@@ -262,6 +263,7 @@ fn didserver(command_type: &CommandServer) {
 
     //PARAMS
     let path = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\keys\\Bob\\";
+    //let path = "/Users/Mehdi/Desktop/Rust/Projet_IOT/nkeys/keys/Bob/";
     let filename_pk = "alice_pk.txt"; //File storing the public key
     let addr = "localhost:8000";
 
@@ -270,6 +272,20 @@ fn didserver(command_type: &CommandServer) {
     // Receive the payload from the client
     let listener = TcpListener::bind(addr).unwrap();
     println!("Server Listening");
+
+    //This is a try to deal with the buffer issue when registering the key.
+    /*let &mut buffer = &[];
+    match command_type{
+        CommandServer::GetPk => {
+            const N :usize = 56;
+            buffer = [0;N];
+        } 
+        CommandServer::GetMessage => {
+            const N :usize = 1024;
+            buffer = [0;N];
+        }
+    }*/
+
     let mut buffer = [0;1024];
     for stream in listener.incoming() {
         match stream {
@@ -288,8 +304,9 @@ fn didserver(command_type: &CommandServer) {
     match command_type{
 
         CommandServer::GetPk => {
-            //TODO : receive the public key
+            //let buffer1 = Vec::from_utf8(&buffer);
             let pk_sender = std::str::from_utf8(&buffer).unwrap(); //why is std:: needed ? and why import isn't used
+            //let pk_sender = &buffer;
 
             //Write it in the public key file
             let f2 = fs::write(&file_pk, &pk_sender);
@@ -305,9 +322,14 @@ fn didserver(command_type: &CommandServer) {
             if pk_sender.is_err() {
                 panic!("Cannot find the public key file");
             }
-            let sender_pub_kp = KeyPair::from_public_key(&pk_sender.unwrap()).unwrap();
 
-            //TODO receive payload_string and sig from the client terminal
+            //TODO deal with the NULL characters in the pk file.
+            let _sender_pub_kp = KeyPair::from_public_key(&pk_sender.unwrap());
+
+            //let test = sender_pub_kp.unwrap();
+
+            let message : Value = serde_json::from_str(std::str::from_utf8(&buffer).unwrap()).unwrap();
+            println!("received a message with the kid {}", message["kid"]);
 
             //Check the signature
             //let res = sender_pub_kp.verify(&payload_string,&sig.as_slice());
@@ -315,32 +337,42 @@ fn didserver(command_type: &CommandServer) {
 
         }    
     }
-
-
-
-
 }
 
 fn didclient(command_type: &CommandClient){
 
     // First we deal with the keys and files storing them
 
-    //Paths
+    //PARAMS
     let path = "C:\\Users\\emmanuel\\Documents\\Projet_IOT\\nkeys\\keys\\Alice\\";
-    //let path = ""; 
+    //let path = "/Users/Mehdi/Desktop/Rust/Projet_IOT/nkeys/keys/Alice/";
+    let filename_pk = "alice_pk.txt"; //File storing the public key
+    let filename_seed = "alice_seed.txt"; 
+    let addr = "localhost:8000";
 
-    //Names of the 2 files that will store the keys
-    let filename_seed = "alice_seed.txt";
-    let filename_pk = "alice_pk.txt";
 
     let file_seed = format!("{}{}", path, filename_seed);
     let file_pk = format!("{}{}", path, filename_pk);
 
-    //Try to read the file to get the seed 
-    let mut seed_sender = fs::read_to_string(&file_seed);
-    let mut pk_sender = fs::read_to_string(&file_pk);
-    if seed_sender.is_err() { 
-        //If it doesn't exist, we create it and update/create the public one
+    //Try to read the files
+    let mut res_seed_sender = fs::read_to_string(&file_seed);
+    let mut res_pk_sender = fs::read_to_string(&file_pk);
+    let mut seed_sender = String::new(); //gonna be the unwrap() of res_seed_sender (deals with issues about unwrap() moving variables)
+    let mut _foo = &seed_sender;
+    let mut _pk_sender = String::new();
+
+    if res_seed_sender.is_ok() {
+        seed_sender = res_seed_sender.unwrap();
+        if res_pk_sender.is_err() {
+            //Just need to rewrite the public key as the seed still exists   
+            res_pk_sender = Ok(KeyPair::from_seed(&seed_sender).unwrap().public_key());
+            let f2 = fs::write(&file_pk, &res_pk_sender.unwrap());
+            if f2.is_err() {
+                panic!("Cannot write the public key file from the seed");
+            };
+        }
+    } else {
+        //If seed file doesn't exist, we create it and update/create the public one
         let kp = KeyPair::new(KeyPairType::User);
 
         let f1 = fs::write(&file_seed, &kp.seed().unwrap());
@@ -354,34 +386,32 @@ fn didclient(command_type: &CommandClient){
         };
 
         //Now that's it's written, we need to update seed_sender and pk_sender
-        seed_sender = fs::read_to_string(&file_seed);
-        pk_sender = fs::read_to_string(&file_pk);
-        if seed_sender.is_err() | pk_sender.is_err(){
+        res_seed_sender = fs::read_to_string(&file_seed);
+        res_pk_sender = fs::read_to_string(&file_pk);
+        if res_seed_sender.is_err() | res_pk_sender.is_err(){
             panic!("Cannot read the seed or pk file");
         }
-    } else if pk_sender.is_err() {
-        pk_sender = Ok(KeyPair::from_seed(&seed_sender.unwrap()).unwrap().public_key());
-        let f2 = fs::write(&file_pk, &pk_sender.unwrap());
-        if f2.is_err() {
-            panic!("Cannot write the public key file from the seed");
-        };
+        seed_sender = res_seed_sender.unwrap();
     }
 
-
+    let seed_sender_str: &str = &seed_sender;
+    let kp_sender = KeyPair::from_seed(seed_sender_str).unwrap(); 
     // Send the commanded packet (public key or message)
     let mut packet = Vec::new(); 
     match command_type {
 
         CommandClient::SendPk => {
+            //Read the public key from the file and here is the packet !
             let mut f = File::open(&file_pk).unwrap();
-            f.read_to_end(&mut packet);
+            let f0 = f.read_to_end(&mut packet);
+            if f0.is_err() {
+                panic!("Cannot read the pk file to send it");
+            }
             println!("You're sending your public key: {}", std::str::from_utf8(&packet).unwrap());
-            //packet = pk_sender.unwrap(); 
-
         }
 
         CommandClient::SendMessage => {
-            /*
+            //Payload that the sender will sign (and encrypt ?) before sending to the server
             let payload = json!({
                 "id": "urn:uuid:ef5a7369-f0b9-4143-a49d-2b9c7ee51117",
                 "type": "didcomm",
@@ -389,21 +419,35 @@ fn didclient(command_type: &CommandClient){
                 "expiry": 1516239022,
                 "time_stamp": 1516269022,
                 "body": { "message": "Challenge!" }
-                });
+            });
             
-            let payload_string = serde_json::to_vec(&payload).unwrap();
-            */
-            println!("You're willing to send a signed message");
-            //payload = b"message with kid etc..."
+            //Sender signs using a keypair from seed
+            let payload_vec = serde_json::to_vec(&payload).unwrap();
+       
+            let sig = kp_sender.sign(&payload_vec).unwrap();
+
+            //Format the message
+            let message = json!({
+                "kid": "ed25519",
+                "payload" : payload,
+                "signature": sig, 
+            });
+            packet = serde_json::to_vec(&message).unwrap();
+
+            println!("You're sending a signed message");
         }
     }
 
-    match TcpStream::connect("localhost:8000"){
+    //Connect and send the packet (pk or message) through a TcpStream
+    match TcpStream::connect(addr){
         Ok(mut stream) => {
-            stream.write(&packet);
+            let f0 = stream.write(&packet);
+            if f0.is_err() {
+                panic!("Cannot write the packet");
+            }
         },
         Err(e) => {
-            panic!("Falied to connect: {}", e);
+            panic!("Failed to connect: {}", e);
         }
     }
 }
