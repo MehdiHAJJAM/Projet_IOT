@@ -3,6 +3,7 @@ extern crate serde_json;
 use nkeys::{self, KeyPair, KeyPairType};
 use serde_json::json;
 use serde_json::{Value};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -140,6 +141,13 @@ impl fmt::Display for OutputParseErr {
             "error parsing output type, see help for the list of accepted outputs"
         )
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Message {
+    kid : String,
+    payload : Value,
+    signature : Vec<u8>,
 }
 
 fn main() {
@@ -286,12 +294,12 @@ fn didserver(command_type: &CommandServer) {
         }
     }*/
 
-    let mut buffer = [0;1024];
+    let mut buffer = Vec::new();
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let mut stream1 = stream;
-                stream1.read(&mut buffer).unwrap();
+                stream1.read_to_end(&mut buffer).unwrap();
                 println!("Message: {} from {}", String::from_utf8_lossy(&buffer[..]), stream1.peer_addr().unwrap());
                 break;                
             }
@@ -324,15 +332,34 @@ fn didserver(command_type: &CommandServer) {
             }
 
             //TODO deal with the NULL characters in the pk file.
-            let _sender_pub_kp = KeyPair::from_public_key(&pk_sender.unwrap());
+            let sender_pub_kp = KeyPair::from_public_key(&pk_sender.unwrap()).unwrap();
 
             //let test = sender_pub_kp.unwrap();
 
-            let message : Value = serde_json::from_str(std::str::from_utf8(&buffer).unwrap()).unwrap();
-            println!("received a message with the kid {}", message["kid"]);
+            let message : Message = serde_json::from_str(std::str::from_utf8(&buffer).unwrap()).unwrap();
+            println!("received a message with the kid {}", message.kid);
+            let kid = &message.kid;
+            let payload = &message.payload;
+            let payload_vec = serde_json::to_vec(&payload).unwrap();
+            let payload_display = std::str::from_utf8(&payload_vec).unwrap();
+            let sig = message.signature;//.as_array().unwrap();
+            //let sig_2 : Vec<u8> = sig.clone();
+            //let sig_vec = serde_json::to_vec(&sig).unwrap();
+    
+            //for debug only
+            //let kp_sender = KeyPair::from_seed("SUAIKCWLDWFLVXQBXGRL522LFG2S3R77WZ3WXOTNAXGCFHY6BAOEJTEOAM").unwrap();
+            //let sig_test = kp_sender.sign(&payload_vec).unwrap();
+            //let sig_display = std::str::from_utf8(&sig_vec).unwrap();
+
 
             //Check the signature
-            //let res = sender_pub_kp.verify(&payload_string,&sig.as_slice());
+            //println!("received a verified message from alice signed with {} : \n {}", &kid, &sig.l;
+            let res = sender_pub_kp.verify(&payload_vec,&sig);
+            if res.is_ok(){
+                println!("received a verified message from Alice signed with {} : \n {}", &kid, &payload_display);
+            } else {
+                println!("you received a message that has been corrupted (signature {} doesn't match) ", &kid);
+            }
 
 
         }    
@@ -434,7 +461,7 @@ fn didclient(command_type: &CommandClient){
             });
             packet = serde_json::to_vec(&message).unwrap();
 
-            println!("You're sending a signed message");
+            println!("You're sending a signed message with signature with length : {}", &sig.len());
         }
     }
 
