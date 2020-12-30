@@ -13,6 +13,7 @@ use signatory::signature;
 use std::{
     error::Error as StdError,
     string::{String, ToString},
+    io,
 };
 
 /// Provides an error type specific to the nkeys library
@@ -40,6 +41,10 @@ pub enum ErrorKind {
     CodecFailure,
     /// Indicates a key type mismatch, e.g. attempting to sign with only a public key
     IncorrectKeyType,
+    /// Indicates an error with the connection to remote client/server
+    ConnectionError,
+    /// Indicates an error in I/O operations
+    IOError,
 }
 
 /// A handy macro borrowed from the `signatory` crate that lets library-internal code generate
@@ -67,6 +72,8 @@ impl ErrorKind {
             ErrorKind::CodecFailure => "Codec failure",
             ErrorKind::SignatureError => "Signature failure",
             ErrorKind::IncorrectKeyType => "Incorrect key type",
+            ErrorKind::ConnectionError => "Connection failure",
+            ErrorKind::IOError => "I/O failure",
         }
     }
 }
@@ -124,5 +131,11 @@ impl fmt::Display for Error {
             Some(ref desc) => write!(f, "{}: {}", self.to_string(), desc),
             None => write!(f, "{}", self.to_string()),
         }
+    }
+}
+
+impl From<std::io::Error> for Error{
+    fn from(source: io::Error) -> Error {
+        err!(IOError, "I/O failure: {}", source)
     }
 }
