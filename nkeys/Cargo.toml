@@ -25,6 +25,7 @@ required-features = ["cli"]
 [dependencies]
 signatory = "0.20" 
 signatory-dalek = "0.20"
+ecies-ed25519 = "0.3"
 rand = "0.7.3"
 byteorder = "1.3.4"
 data-encoding = "2.3.0"
